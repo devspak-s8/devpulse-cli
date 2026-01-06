@@ -1,0 +1,331 @@
+Metadata-Version: 2.4
+Name: devpulse-cli
+Version: 0.1.3
+Summary: DevPulse - Developer Productivity CLI Tool
+Home-page: https://github.com/yourusername/devpulse
+Author: DevPulse Maintainers
+Author-email: DevPulse Maintainers <maintainers@devpulse.dev>
+License: MIT
+Project-URL: Homepage, https://github.com/yourusername/devpulse
+Project-URL: Source, https://github.com/yourusername/devpulse
+Project-URL: Tracker, https://github.com/yourusername/devpulse/issues
+Keywords: developer,productivity,cli,time-tracking,logs,secrets,analytics
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Operating System :: OS Independent
+Classifier: Topic :: Software Development :: Libraries
+Classifier: Topic :: Utilities
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: typer<0.13,>=0.12
+Requires-Dist: rich>=13.7.0
+Requires-Dist: colorama>=0.4.6
+Requires-Dist: tabulate>=0.9.0
+Requires-Dist: psutil>=5.9.0
+Requires-Dist: pathspec>=0.12.0
+Requires-Dist: tqdm>=4.66.0
+Requires-Dist: questionary>=2.0.0
+Requires-Dist: pyperclip>=1.8.2
+Requires-Dist: python-dateutil>=2.8.2
+Provides-Extra: ai
+Requires-Dist: openai>=1.10.0; extra == "ai"
+Requires-Dist: anthropic>=0.8.0; extra == "ai"
+Provides-Extra: data
+Requires-Dist: pandas>=2.1.0; extra == "data"
+Requires-Dist: numpy>=1.26.0; extra == "data"
+Provides-Extra: viz
+Requires-Dist: matplotlib>=3.8.0; extra == "viz"
+Requires-Dist: plotly>=5.18.0; extra == "viz"
+Provides-Extra: db
+Requires-Dist: sqlalchemy>=2.0.0; extra == "db"
+Requires-Dist: alembic>=1.13.0; extra == "db"
+Provides-Extra: config
+Requires-Dist: pydantic>=2.5.0; extra == "config"
+Requires-Dist: pydantic-settings>=2.1.0; extra == "config"
+Requires-Dist: python-dotenv>=1.0.0; extra == "config"
+Requires-Dist: PyYAML>=6.0.1; extra == "config"
+Provides-Extra: time
+Requires-Dist: pendulum>=3.0.0; extra == "time"
+Provides-Extra: secrets
+Requires-Dist: detect-secrets>=1.4.0; extra == "secrets"
+Requires-Dist: python-magic>=0.4.27; extra == "secrets"
+Provides-Extra: watch
+Requires-Dist: watchdog>=3.0.0; extra == "watch"
+Provides-Extra: http
+Requires-Dist: requests>=2.31.0; extra == "http"
+Requires-Dist: httpx>=0.26.0; extra == "http"
+Provides-Extra: full
+Requires-Dist: openai>=1.10.0; extra == "full"
+Requires-Dist: anthropic>=0.8.0; extra == "full"
+Requires-Dist: pandas>=2.1.0; extra == "full"
+Requires-Dist: numpy>=1.26.0; extra == "full"
+Requires-Dist: matplotlib>=3.8.0; extra == "full"
+Requires-Dist: plotly>=5.18.0; extra == "full"
+Requires-Dist: sqlalchemy>=2.0.0; extra == "full"
+Requires-Dist: alembic>=1.13.0; extra == "full"
+Requires-Dist: pydantic>=2.5.0; extra == "full"
+Requires-Dist: pydantic-settings>=2.1.0; extra == "full"
+Requires-Dist: python-dotenv>=1.0.0; extra == "full"
+Requires-Dist: PyYAML>=6.0.1; extra == "full"
+Requires-Dist: pendulum>=3.0.0; extra == "full"
+Requires-Dist: detect-secrets>=1.4.0; extra == "full"
+Requires-Dist: python-magic>=0.4.27; extra == "full"
+Requires-Dist: watchdog>=3.0.0; extra == "full"
+Requires-Dist: requests>=2.31.0; extra == "full"
+Requires-Dist: httpx>=0.26.0; extra == "full"
+Dynamic: author
+Dynamic: home-page
+Dynamic: requires-python
+
+# DevPulse - Developer Productivity CLI Tool
+
+Complete developer productivity tracking with 17 command groups, 200+ tests, and AI-powered insights.
+
+**📖 [Full Help Guide](CLI_HELP_GUIDE.md) | 🚀 [Quick Examples](QUICK_START_EXAMPLES.md) | 📦 [Features](README_HELP.md)**
+
+## 17 Command Groups
+
+### Core Productivity
+- **🎯 Track** - Time tracking and task management (15 tests)
+- **📊 Stats** - Analytics and statistics (20 tests)  
+- **💊 Health** - Real-time system monitoring (22 tests)
+- **📝 Logs** - Log analysis and search (18 tests)
+- **🔐 Secrets** - Scan for exposed secrets (17 tests)
+- **🔄 Sync** - Cloud synchronization (17 tests)
+- **🤖 AI** - AI-powered insights (15 tests)
+
+### Time & Focus ✨ NEW
+- **⏰ Timer** - Pomodoro timers (8 tests)
+- **🎯 Focus** - Focus mode with blocking (9 tests)
+- **☕ Breaks** - Break scheduling (8 tests)
+- **🔗 Habits** - Habit tracking (8 tests)
+
+### Organization ✨ NEW
+- **📦 Project** - Project management (7 tests)
+- **📝 Notes** - Note-taking (7 tests)
+- **📊 Report** - Productivity reports (7 tests)
+- **📱 Dashboard** - Dashboard view (7 tests)
+
+### Data Management ✨ NEW
+- **⚙️ Config** - Configuration (7 tests)
+- **📤 Export** - Data export (8 tests)
+
+## Installation
+
+```bash
+# Basic install
+pip install devpulse-cli
+
+# With all features
+pip install devpulse-cli[full]
+
+# From source
+git clone <repo>
+cd devpulse
+pip install -e .
+```
+
+## How to Use
+
+### View Help
+```bash
+# All commands
+devpulse --help
+
+# Specific command
+devpulse track --help
+
+# Subcommand
+devpulse track start --help
+```
+
+### Track Your Work
+```bash
+# Start task
+devpulse track start "Implement feature"
+
+# Check status
+devpulse track status
+
+# Stop tracking
+devpulse track stop
+
+# View sessions
+devpulse track list --today
+```
+
+### Pomodoro Timer
+```bash
+# 25-minute timer
+devpulse timer start
+
+# Custom duration
+devpulse timer start 45
+
+# With task
+devpulse timer start 30 --task "code review"
+```
+
+### Focus Mode
+```bash
+# 60-minute focus
+devpulse focus start
+
+# With goal
+devpulse focus start 90 --goal "Implementation"
+
+# Block distractions
+devpulse focus block twitter.com
+```
+
+### Health Check
+```bash
+# System metrics
+devpulse health check
+
+# Top processes
+devpulse health processes --top 10
+
+# Specific metric
+devpulse health check --cpu
+```
+
+### Reports & Insights
+```bash
+# Daily report
+devpulse report daily
+
+# Weekly stats
+devpulse stats show --week
+
+# AI insights
+devpulse ai insights --detailed
+```
+
+### Habit Tracking
+```bash
+# Create habit
+devpulse habits create "meditation"
+
+# Log completion
+devpulse habits log "meditation"
+
+# View streak
+devpulse habits streak "meditation"
+```
+
+### Data Export
+```bash
+# Export all
+devpulse export all --format json
+
+# Export period
+devpulse track export --range 2026-01-01:2026-01-31
+
+# Generate report
+devpulse stats report --format html --output report.html
+```
+
+## Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [CLI_HELP_GUIDE.md](CLI_HELP_GUIDE.md) | Complete command reference with all options |
+| [QUICK_START_EXAMPLES.md](QUICK_START_EXAMPLES.md) | Real-world examples with actual output |
+| [README_HELP.md](README_HELP.md) | Feature overview and detailed guide |
+| [NEW_COMMANDS_SUMMARY.md](NEW_COMMANDS_SUMMARY.md) | New features in latest release |
+
+## Development
+
+Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+Run tests:
+```bash
+# All tests
+pytest tests/
+
+# With coverage
+pytest tests/ --cov=devpulse --cov-report=html
+
+# Verbose output
+pytest tests/ -v
+```
+
+### Test Results
+- **200 tests** total
+- **82% coverage**
+- **All passing** ✅
+
+## Examples
+
+### Morning Standup Check
+```bash
+devpulse health check
+devpulse report daily
+devpulse stats show --week
+```
+
+### During Work
+```bash
+devpulse focus start 90 --goal "Feature implementation"
+devpulse timer start 25                    # Pomodoro
+devpulse breaks take                       # When prompted
+devpulse track start "Task name"
+devpulse track stop
+```
+
+### End of Day
+```bash
+devpulse report daily --detailed
+devpulse habits stats
+devpulse export all --format json          # Backup
+```
+
+### Weekly Review
+```bash
+devpulse stats show --week
+devpulse report weekly
+devpulse ai insights --detailed
+```
+
+## Tips
+
+### Create Aliases
+```bash
+alias track='devpulse track'
+alias health='devpulse health check'
+alias stats='devpulse stats show'
+```
+
+### Automate
+```bash
+# Cron: Daily report at 6 PM
+0 18 * * * devpulse report daily --output ~/reports/daily.html
+
+# Cron: Weekly backup on Friday
+0 17 * * 5 devpulse export all --format json
+```
+
+### Help
+```bash
+# For any command
+devpulse COMMAND --help
+
+# Or see complete guide
+# Check: CLI_HELP_GUIDE.md
+```
+
+## License
+
+MIT License
