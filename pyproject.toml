@@ -5,20 +5,26 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "devpulse-cli"
 version = "0.1.3"
-description = "DevPulse - Developer Productivity CLI Tool"
+description = "DevPulse – Developer Productivity CLI and GitHub analytics"
 readme = "README.md"
 requires-python = ">=3.9"
-authors = [
-  { name = "DevPulse Maintainers", email = "maintainers@devpulse.dev" },
-]
+authors = [{ name = "DevPulse Maintainers", email = "maintainers@devpulse.dev" }]
 license = { text = "MIT" }
-keywords = ["developer", "productivity", "cli", "time-tracking", "logs", "secrets", "analytics"]
+keywords = [
+  "developer-productivity",
+  "cli",
+  "github",
+  "analytics",
+  "fastapi",
+  "typer",
+]
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 4 - Beta",
   "Intended Audience :: Developers",
   "License :: OSI Approved :: MIT License",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
@@ -32,17 +38,19 @@ classifiers = [
 dependencies = [
   "typer>=0.12,<0.13",
   "rich>=13.7.0",
-  "colorama>=0.4.6",
-  "tabulate>=0.9.0",
+  "requests>=2.31.0",
+  "questionary>=2.0.0",
   "psutil>=5.9.0",
   "pathspec>=0.12.0",
-  "tqdm>=4.66.0",
-  "questionary>=2.0.0",
-  "pyperclip>=1.8.2",
   "python-dateutil>=2.8.2",
+  "tabulate>=0.9.0",
+  "tqdm>=4.66.0",
+  "pyperclip>=1.8.2",
+  "colorama>=0.4.6",
 ]
 
 [project.optional-dependencies]
+api = ["fastapi>=0.115.0", "uvicorn>=0.28.0"]
 ai = ["openai>=1.10.0", "anthropic>=0.8.0"]
 data = ["pandas>=2.1.0", "numpy>=1.26.0"]
 viz = ["matplotlib>=3.8.0", "plotly>=5.18.0"]
@@ -51,8 +59,9 @@ config = ["pydantic>=2.5.0", "pydantic-settings>=2.1.0", "python-dotenv>=1.0.0",
 time = ["pendulum>=3.0.0"]
 secrets = ["detect-secrets>=1.4.0", "python-magic>=0.4.27"]
 watch = ["watchdog>=3.0.0"]
-http = ["requests>=2.31.0", "httpx>=0.26.0"]
 full = [
+  "fastapi>=0.115.0",
+  "uvicorn>=0.28.0",
   "openai>=1.10.0",
   "anthropic>=0.8.0",
   "pandas>=2.1.0",
@@ -69,14 +78,12 @@ full = [
   "detect-secrets>=1.4.0",
   "python-magic>=0.4.27",
   "watchdog>=3.0.0",
-  "requests>=2.31.0",
-  "httpx>=0.26.0",
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/devpulse"
-Source = "https://github.com/yourusername/devpulse"
-Tracker = "https://github.com/yourusername/devpulse/issues"
+Homepage = "https://github.com/devspak-s8/devpulse-cli"
+Repository = "https://github.com/devspak-s8/devpulse-cli"
+Issues = "https://github.com/devspak-s8/devpulse-cli/issues"
 
 [project.scripts]
 devpulse = "devpulse.cli:main"
