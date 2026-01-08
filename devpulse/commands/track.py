@@ -8,7 +8,7 @@ def start(task: str = typer.Argument(..., help="Task name to track")):
     """
     Start tracking time for a task.
     """
-    typer.echo(f"⏱️  Started tracking: {task}")
+    typer.echo(f"[*] Started tracking: {task}")
     typer.echo("Timer is now running...")
 
 
@@ -57,7 +57,7 @@ def list(
     List all tracked sessions.
     """
     filter_text = "today" if today else f"last {limit}"
-    typer.echo(f"📋 Tracking sessions ({filter_text}):")
+    typer.echo(f"[*] Tracking sessions ({filter_text}):")
     typer.echo("No sessions found.")
 
 

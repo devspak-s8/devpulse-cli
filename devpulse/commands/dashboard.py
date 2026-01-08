@@ -10,12 +10,12 @@ def show(period: str = typer.Option("today", "--period", "-p", help="Period (tod
     typer.echo(f"📊 DevPulse Dashboard - {period.upper()}")
     typer.echo(f"{'='*60}\n")
     
-    typer.echo("⏱️  Time Tracked:")
+    typer.echo("[*] Time Tracked:")
     typer.echo("   Today: 0h 0m")
     typer.echo("   This week: 0h 0m")
     typer.echo("   This month: 0h 0m\n")
     
-    typer.echo("🎯 Tasks:")
+    typer.echo("[*] Tasks:")
     typer.echo("   Completed: 0")
     typer.echo("   In progress: 0")
     typer.echo("   Not started: 0\n")
@@ -48,7 +48,7 @@ def quick():
 @app.command()
 def goals():
     """Show goals dashboard."""
-    typer.echo("\n🎯 Goals Dashboard:")
+    typer.echo("\n[*] Goals Dashboard:")
     typer.echo("Daily goals: Not set")
     typer.echo("Weekly goals: Not set")
     typer.echo("Monthly goals: Not set\n")
@@ -76,4 +76,4 @@ def stats():
 def refresh():
     """Refresh dashboard data."""
     typer.echo("🔄 Refreshing dashboard...")
-    typer.echo("✅ Dashboard updated!")
+    typer.echo("[OK] Dashboard updated!")

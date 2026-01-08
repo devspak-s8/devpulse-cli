@@ -74,7 +74,7 @@ def auto(
     elif disable:
         typer.echo("⏸️  Auto-sync disabled")
     else:
-        typer.echo(f"⚙️  Auto-sync: Disabled")
+        typer.echo(f"[*] Auto-sync: Disabled")
         typer.echo(f"Interval: {interval} minutes")
 
 
@@ -98,7 +98,7 @@ def conflicts(
     """
     View and resolve sync conflicts.
     """
-    typer.echo("⚠️  Sync Conflicts:")
+    typer.echo("[!] Sync Conflicts:")
     typer.echo("No conflicts detected.")
     if resolve:
         typer.echo(f"\nResolution strategy: {strategy}")
@@ -120,7 +120,7 @@ def backup(
         typer.echo("📥 Restoring from cloud backup...")
         typer.echo("✅ Restore completed!")
     elif list_all:
-        typer.echo("📋 Available Backups:")
+        typer.echo("[*] Available Backups:")
         typer.echo("No backups found.")
 
 
@@ -134,7 +134,7 @@ def settings(
     Configure cloud sync settings.
     """
     if show:
-        typer.echo("⚙️  Cloud Sync Settings:")
+        typer.echo("[*] Cloud Sync Settings:")
         typer.echo("Endpoint: Not configured")
         typer.echo("Timeout: 30s")
     if endpoint:

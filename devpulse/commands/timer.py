@@ -9,7 +9,7 @@ def start(
     task: str = typer.Option(None, "--task", "-t", help="Task name for this session")
 ):
     """Start a Pomodoro timer."""
-    typer.echo(f"⏱️  Starting {duration}-minute timer")
+    typer.echo(f"[*] Starting {duration}-minute timer")
     if task:
         typer.echo(f"Task: {task}")
     typer.echo("Timer running... [Future: real countdown implementation]")
@@ -25,7 +25,7 @@ def stop():
 @app.command()
 def status():
     """Show timer status."""
-    typer.echo("⏱️  Timer Status: Not running")
+    typer.echo("[*] Timer Status: Not running")
     typer.echo("Last session: 25m")
 
 
@@ -37,7 +37,7 @@ def preset(
     """Use a timer preset."""
     presets = {"pomodoro": 25, "shortbreak": 5, "longbreak": 15}
     minutes = duration or presets.get(name, 25)
-    typer.echo(f"⏱️  Starting {name} preset: {minutes} minutes")
+    typer.echo(f"[*] Starting {name} preset: {minutes} minutes")
 
 
 @app.command()

@@ -9,7 +9,7 @@ def start(
     goal: str = typer.Option(None, "--goal", "-g", help="Focus session goal")
 ):
     """Start focus mode."""
-    typer.echo(f"🎯 Focus mode activated for {duration} minutes")
+    typer.echo(f"[*] Focus mode activated for {duration} minutes")
     if goal:
         typer.echo(f"Goal: {goal}")
     typer.echo("Distractions blocked... [Future: real blocking implementation]")
@@ -18,7 +18,7 @@ def start(
 @app.command()
 def stop():
     """Stop focus mode."""
-    typer.echo("🎯 Focus mode stopped")
+    typer.echo("[*] Focus mode stopped")
     typer.echo("Session duration: 60m 0s")
     typer.echo("Interruptions: 0")
 
@@ -26,7 +26,7 @@ def stop():
 @app.command()
 def status():
     """Check focus mode status."""
-    typer.echo("🎯 Focus Mode: Inactive")
+    typer.echo("[*] Focus Mode: Inactive")
     typer.echo("Last session: 60m with 0 interruptions")
 
 
@@ -37,13 +37,13 @@ def block(
 ):
     """Block a distracting app or website."""
     typer.echo(f"🚫 Blocking {app_name} for {duration} minutes")
-    typer.echo("✅ Block activated!")
+    typer.echo("[OK] Block activated!")
 
 
 @app.command()
 def unblock(app_name: str = typer.Argument(..., help="App/website to unblock")):
     """Unblock an app or website."""
-    typer.echo(f"✅ Unblocked {app_name}")
+    typer.echo(f"[OK] Unblocked {app_name}")
 
 
 @app.command()

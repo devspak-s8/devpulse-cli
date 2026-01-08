@@ -13,7 +13,7 @@ def daily(
     typer.echo("Time tracked: 0h 0m")
     typer.echo("Tasks completed: 0")
     if detailed:
-        typer.echo("\n📋 Breakdown:")
+        typer.echo("\n[*] Breakdown:")
         typer.echo("- Morning: 0h")
         typer.echo("- Afternoon: 0h")
         typer.echo("- Evening: 0h")
@@ -27,7 +27,7 @@ def weekly(export: str = typer.Option(None, "--export", "-e", help="Export forma
     typer.echo("Most productive day: N/A")
     typer.echo("Average daily: 0h")
     if export:
-        typer.echo(f"\n✅ Report exported as {export}")
+        typer.echo(f"\n[OK] Report exported as {export}")
 
 
 @app.command()
@@ -61,6 +61,6 @@ def summary():
 @app.command()
 def insights():
     """AI insights on productivity."""
-    typer.echo("💡 Productivity Insights:")
+    typer.echo("[*] Productivity Insights:")
     typer.echo("- No data available for analysis")
     typer.echo("- Start tracking to see insights")

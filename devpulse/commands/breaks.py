@@ -10,7 +10,7 @@ def schedule(
 ):
     """Schedule automatic breaks."""
     typer.echo(f"☕ Breaks scheduled: every {interval}m for {duration}m")
-    typer.echo("✅ Schedule activated!")
+    typer.echo("[OK] Schedule activated!")
 
 
 @app.command()

@@ -10,31 +10,31 @@ def create(
     goal: int = typer.Option(1, "--goal", "-g", help="Daily/weekly goal")
 ):
     """Create a new habit."""
-    typer.echo(f"🎯 Habit created: {name}")
+    typer.echo(f"[*] Habit created: {name}")
     typer.echo(f"Frequency: {frequency}")
     typer.echo(f"Goal: {goal}x per {frequency}")
-    typer.echo("✅ Habit tracking started!")
+    typer.echo("[OK] Habit tracking started!")
 
 
 @app.command()
 def list(active: bool = typer.Option(True, "--all", help="Show all habits")):
     """List habits."""
     filter_text = "Active" if active else "All"
-    typer.echo(f"📋 {filter_text} Habits:")
+    typer.echo(f"[*] {filter_text} Habits:")
     typer.echo("No habits tracked yet.")
 
 
 @app.command()
 def log(habit_name: str = typer.Argument(..., help="Habit to log"), count: int = typer.Option(1, "--count", "-c")):
     """Log habit completion."""
-    typer.echo(f"✅ Logged {count}x for: {habit_name}")
+    typer.echo(f"[OK] Logged {count}x for: {habit_name}")
     typer.echo(f"Current streak: 0 days")
 
 
 @app.command()
 def streak(habit_name: str = typer.Argument(..., help="Habit name")):
     """Check habit streak."""
-    typer.echo(f"🔥 Streak for {habit_name}:")
+    typer.echo(f"[*] Streak for {habit_name}:")
     typer.echo("Current: 0 days")
     typer.echo("Best: 0 days")
 

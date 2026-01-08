@@ -14,7 +14,7 @@ def add(
     if tag:
         typer.echo(f"Tag: {tag}")
     typer.echo(f"Priority: {priority}")
-    typer.echo("✅ Note saved!")
+    typer.echo("[OK] Note saved!")
 
 
 @app.command()
@@ -24,7 +24,7 @@ def list(
 ):
     """List all notes."""
     filter_text = f"(tag: {tag})" if tag else ""
-    typer.echo(f"📋 Notes {filter_text}:")
+    typer.echo(f"[*] Notes {filter_text}:")
     typer.echo("No notes yet.")
 
 
@@ -54,4 +54,4 @@ def tags():
 def export(format: str = typer.Option("txt", "--format", "-f", help="Export format (txt, md, json)")):
     """Export notes."""
     typer.echo(f"📤 Exporting notes as {format}...")
-    typer.echo("✅ Export complete!")
+    typer.echo("[OK] Export complete!")

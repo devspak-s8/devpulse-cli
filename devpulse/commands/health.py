@@ -10,28 +10,28 @@ def check(
     service: str = typer.Option("all", "--service", "-s", help="Service to check (all, cpu, memory, disk, processes)")
 ):
     """Check system health status."""
-    typer.echo(f"🏥 Checking health: {service}\n")
+    typer.echo(f"[*] Checking health: {service}\n")
     
     if service in ["all", "cpu"]:
         cpu_percent = psutil.cpu_percent(interval=0.1)
-        status = "✅" if cpu_percent < 80 else "⚠️"
+        status = "[OK]" if cpu_percent < 80 else "[!]"
         typer.echo(f"{status} CPU Usage: {cpu_percent}%")
     
     if service in ["all", "memory"]:
         memory = psutil.virtual_memory()
-        status = "✅" if memory.percent < 80 else "⚠️"
+        status = "[OK]" if memory.percent < 80 else "[!]"
         typer.echo(f"{status} Memory Usage: {memory.percent}% ({memory.used // (1024**3)}GB / {memory.total // (1024**3)}GB)")
     
     if service in ["all", "disk"]:
         disk = psutil.disk_usage('/')
-        status = "✅" if disk.percent < 90 else "⚠️"
+        status = "[OK]" if disk.percent < 90 else "[!]"
         typer.echo(f"{status} Disk Usage: {disk.percent}% ({disk.used // (1024**3)}GB / {disk.total // (1024**3)}GB)")
     
     if service in ["all", "processes"]:
         process_count = len(psutil.pids())
-        typer.echo(f"📊 Active Processes: {process_count}")
+        typer.echo(f"[*] Active Processes: {process_count}")
     
-    typer.echo("\n✅ Health check complete!")
+    typer.echo("\n[OK] Health check complete!")
 
 
 @app.command()
@@ -74,7 +74,7 @@ def report(
         typer.echo(f"   Usage: {disk.percent}%\n")
         
         # System Info
-        typer.echo(f"📋 System Information:")
+        typer.echo(f"[*] System Information:")
         typer.echo(f"   Platform: {psutil.os.name}")
         typer.echo(f"   Processes: {len(psutil.pids())}")
         typer.echo(f"   Boot Time: {datetime.fromtimestamp(psutil.boot_time()).strftime('%Y-%m-%d %H:%M:%S')}")
@@ -113,7 +113,7 @@ def processes(
     sort_by: str = typer.Option("memory", "--sort", "-s", help="Sort by (memory, cpu, name)")
 ):
     """List top processes by resource usage."""
-    typer.echo(f"\n📋 Top {top} Processes (by {sort_by}):\n")
+    typer.echo(f"\n[*] Top {top} Processes (by {sort_by}):\n")
     
     processes_list = []
     for proc in psutil.process_iter(['pid', 'name', 'memory_percent', 'cpu_percent']):
@@ -154,18 +154,18 @@ def alert(
     
     cpu_percent = psutil.cpu_percent(interval=0.1)
     if cpu_percent > cpu_threshold:
-        alerts.append(f"⚠️  CPU ALERT: Usage is {cpu_percent}% (threshold: {cpu_threshold}%)")
+        alerts.append(f"[!] CPU ALERT: Usage is {cpu_percent}% (threshold: {cpu_threshold}%)")
     
     memory = psutil.virtual_memory()
     if memory.percent > memory_threshold:
-        alerts.append(f"⚠️  MEMORY ALERT: Usage is {memory.percent}% (threshold: {memory_threshold}%)")
+        alerts.append(f"[!] MEMORY ALERT: Usage is {memory.percent}% (threshold: {memory_threshold}%)")
     
     disk = psutil.disk_usage('/')
     if disk.percent > disk_threshold:
-        alerts.append(f"⚠️  DISK ALERT: Usage is {disk.percent}% (threshold: {disk_threshold}%)")
+        alerts.append(f"[!] DISK ALERT: Usage is {disk.percent}% (threshold: {disk_threshold}%)")
     
     if alerts:
         for alert_msg in alerts:
             typer.echo(alert_msg)
     else:
-        typer.echo("✅ No alerts - all metrics within thresholds!")
+        typer.echo("[OK] No alerts - all metrics within thresholds!")

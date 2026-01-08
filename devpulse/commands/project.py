@@ -14,13 +14,13 @@ def create(
     if description:
         typer.echo(f"Description: {description}")
     typer.echo(f"Color: {color}")
-    typer.echo("✅ Project created successfully!")
+    typer.echo("[OK] Project created successfully!")
 
 
 @app.command()
 def list():
     """List all projects."""
-    typer.echo("📋 Projects:")
+    typer.echo("[*] Projects:")
     typer.echo("No projects yet. Create one with 'devpulse project create <name>'")
 
 
@@ -28,7 +28,7 @@ def list():
 def switch(project_name: str = typer.Argument(..., help="Project to switch to")):
     """Switch to a different project."""
     typer.echo(f"🔄 Switching to project: {project_name}")
-    typer.echo("✅ Project switched!")
+    typer.echo("[OK] Project switched!")
 
 
 @app.command()
@@ -53,4 +53,4 @@ def info(project_name: str = typer.Argument(None, help="Project name")):
 def archive(project_name: str = typer.Argument(..., help="Project to archive")):
     """Archive a project."""
     typer.echo(f"📦 Archived project: {project_name}")
-    typer.echo("✅ Project archived!")
+    typer.echo("[OK] Project archived!")

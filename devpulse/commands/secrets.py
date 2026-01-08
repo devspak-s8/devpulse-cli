@@ -21,7 +21,7 @@ def list():
     """
     List all detected secrets from previous scans.
     """
-    typer.echo("📋 Secret Detection History:")
+    typer.echo("[*] Secret Detection History:")
     typer.echo("No secrets found in database.")
 
 
@@ -94,7 +94,7 @@ def patterns(
     Manage secret detection patterns.
     """
     if list_all:
-        typer.echo("📋 Available detection patterns:")
+        typer.echo("[*] Available detection patterns:")
         typer.echo("- API Keys\n- AWS Credentials\n- Private Keys\n- Tokens")
     elif add:
         typer.echo(f"➕ Added pattern: {add}")

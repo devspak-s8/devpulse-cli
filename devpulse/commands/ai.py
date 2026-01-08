@@ -74,7 +74,7 @@ def insights(
         typer.echo("- Task completion patterns")
         typer.echo("- Focus vs distraction analysis")
     if export:
-        typer.echo(f"\n✅ Insights exported to: {export}")
+        typer.echo(f"\n[OK] Insights exported to: {export}")
 
 
 @app.command()
@@ -105,7 +105,7 @@ def optimize(
     typer.echo("2. Take regular breaks every 90 minutes")
     typer.echo("3. Group similar tasks together")
     if apply:
-        typer.echo("\n✅ Optimizations applied to schedule!")
+        typer.echo("\n[OK] Optimizations applied to schedule!")
 
 
 @app.command()
@@ -132,7 +132,7 @@ def feedback(
     Provide feedback on AI suggestions.
     """
     if rating and suggestion_id:
-        typer.echo(f"✅ Feedback recorded for suggestion #{suggestion_id}")
+        typer.echo(f"[OK] Feedback recorded for suggestion #{suggestion_id}")
         typer.echo(f"Rating: {rating}/5")
         if comment:
             typer.echo(f"Comment: {comment}")

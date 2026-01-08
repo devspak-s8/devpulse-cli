@@ -83,7 +83,7 @@ def productivity(
     if score:
         typer.echo("Productivity Score: N/A")
     if insights:
-        typer.echo("\n💡 Insights: No data available for analysis.")
+        typer.echo("\n[*] Insights: No data available for analysis.")
     typer.echo("\nFocus time: 0h | Break time: 0h | Distractions: 0")
 
 
@@ -97,7 +97,7 @@ def goals(
     Manage productivity goals and targets.
     """
     if action == "list":
-        typer.echo(f"🎯 {goal_type.capitalize()} Goals:")
+        typer.echo(f"[*] {goal_type.capitalize()} Goals:")
         typer.echo("No goals set.")
     elif action == "set" and target:
         typer.echo(f"✅ Set {goal_type} goal: {target}")

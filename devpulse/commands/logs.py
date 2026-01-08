@@ -87,7 +87,7 @@ def warnings(
     Extract and display all warnings from logs.
     """
     target = log_file if log_file else "all logs"
-    typer.echo(f"⚠️  Warnings in {target}:")
+    typer.echo(f"[!] Warnings in {target}:")
     typer.echo("Total warnings: 0")
     if not count_only:
         typer.echo("No warnings found.")

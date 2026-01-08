@@ -11,9 +11,9 @@ CONFIG_DIR = Path.home() / ".devpulse"
 def show(key: str = typer.Argument(None, help="Config key (optional)")):
     """Show configuration."""
     if key:
-        typer.echo(f"⚙️  {key}: (not set)")
+        typer.echo(f"[*] {key}: (not set)")
     else:
-        typer.echo("⚙️  DevPulse Configuration:")
+        typer.echo("[*] DevPulse Configuration:")
         typer.echo("user.name: (not set)")
         typer.echo("theme: light")
         typer.echo("notifications: enabled")
@@ -22,13 +22,13 @@ def show(key: str = typer.Argument(None, help="Config key (optional)")):
 @app.command()
 def set(key: str = typer.Argument(..., help="Config key"), value: str = typer.Argument(..., help="Config value")):
     """Set a configuration value."""
-    typer.echo(f"✅ Set {key} = {value}")
+    typer.echo(f"[OK] Set {key} = {value}")
 
 
 @app.command()
 def get(key: str = typer.Argument(..., help="Config key")):
     """Get a configuration value."""
-    typer.echo(f"⚙️  {key}: (not set)")
+    typer.echo(f"[*] {key}: (not set)")
 
 
 @app.command()
@@ -36,13 +36,13 @@ def reset(confirm: bool = typer.Option(False, "--confirm", "-c")):
     """Reset configuration to defaults."""
     if not confirm:
         typer.confirm("Reset all configuration to defaults?", abort=True)
-    typer.echo("✅ Configuration reset to defaults")
+    typer.echo("[OK] Configuration reset to defaults")
 
 
 @app.command()
 def list():
     """List all configuration."""
-    typer.echo("⚙️  All Configuration:")
+    typer.echo("[*] All Configuration:")
     typer.echo("No configuration set yet")
 
 
@@ -50,11 +50,11 @@ def list():
 def import_config(file: str = typer.Argument(..., help="Config file path")):
     """Import configuration from file."""
     typer.echo(f"📥 Importing config from {file}")
-    typer.echo("✅ Configuration imported!")
+    typer.echo("[OK] Configuration imported!")
 
 
 @app.command()
 def export_config(file: str = typer.Argument("devpulse.json", help="Output file")):
     """Export configuration to file."""
     typer.echo(f"📤 Exporting config to {file}")
-    typer.echo("✅ Configuration exported!")
+    typer.echo("[OK] Configuration exported!")
