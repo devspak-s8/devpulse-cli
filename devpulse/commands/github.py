@@ -1,6 +1,8 @@
 import typer
 import json as json_lib
 from typing import Optional, List
+import requests
+from datetime import datetime
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
@@ -199,74 +201,99 @@ def _render_repo_stats(stats: dict) -> None:
 @app.command()
 def activity(
     username: str = typer.Argument(..., help="GitHub username"),
-    json: bool = typer.Option(False, "--json", help="Output as JSON"),
+    json: bool = typer.Option(False, "--json", help="Output raw structured JSON"),
+    events: Optional[str] = typer.Option(None, "--events", help="Comma-separated filter (e.g. push,pr,issues,stars)"),
+    since: str = typer.Option("30d", "--since", help="Time window (7d, 30d, 90d)"),
+    debug: bool = typer.Option(False, "--debug", help="Print API request/response metadata"),
     force_refresh: bool = typer.Option(False, "--force-refresh", help="Bypass cache and force fresh API call"),
+    timeout: int = typer.Option(10, "--timeout", help="Request timeout in seconds"),
 ):
-    """Display commit activity and contribution summary for a user."""
-    svc = GitHubService()
-    
+    """Fetch and summarize public GitHub user activity events."""
+    # Parse since window
+    since_map = {"7d": 7, "30d": 30, "90d": 90}
+    if since not in since_map:
+        typer.echo("Invalid --since value. Use one of: 7d, 30d, 90d")
+        raise typer.Exit(code=1)
+    since_days = since_map[since]
+
+    filters_list: Optional[List[str]] = None
+    if events:
+        filters_list = [e.strip().lower() for e in events.split(",") if e.strip()]
+
+    svc = GitHubService(timeout=timeout)
+
     try:
-        # Get user's repos and aggregate activity
-        repos = svc.get_user_repos(username, per_page=100, force_refresh=force_refresh)
-        
-        total_commits_7d = 0
-        total_commits_30d = 0
-        active_repos = 0
-        
-        repo_activity = []
-        for r in repos[:10]:  # Limit to top 10 to avoid rate limits
-            owner = r.get("owner", {}).get("login")
-            name = r.get("name")
-            if owner and name:
-                try:
-                    act = svc.get_commit_activity(owner, name, force_refresh=force_refresh)
-                    total_commits_7d += act.get("commits_last_7_days", 0)
-                    total_commits_30d += act.get("commits_last_30_days", 0)
-                    if act.get("active"):
-                        active_repos += 1
-                    repo_activity.append({
-                        "repo": f"{owner}/{name}",
-                        "commits_7d": act.get("commits_last_7_days", 0),
-                        "commits_30d": act.get("commits_last_30_days", 0),
-                    })
-                except Exception:
-                    pass
-        
+        raw = svc.get_user_public_events(username, per_page=100, force_refresh=force_refresh)
+        summary = svc.parse_and_summarize_events(raw, since_days=since_days, filters=filters_list)
+
         result = {
             "username": username,
-            "total_repos": len(repos),
-            "active_repos": active_repos,
-            "total_commits_last_7_days": total_commits_7d,
-            "total_commits_last_30_days": total_commits_30d,
-            "repo_activity": repo_activity,
+            **summary,
         }
-        
+
+        # JSON output
         if json:
             _output_json(result)
             return
-        
-        # Display
-        console.print(Panel.fit(f"Activity Summary for: {username}", title="GitHub User"))
-        
-        table = Table(title="Overall Activity")
+
+        # Rich output
+        console.print(Panel.fit(f"GitHub Activity: {username}", title="User"))
+
+        status = "Active" if result["total_events"] > 0 else "Inactive"
+        table = Table(title=f"Summary (last {since})")
         table.add_column("Metric", style="cyan")
         table.add_column("Value", style="yellow")
-        table.add_row("Total Repositories", str(result["total_repos"]))
-        table.add_row("Active Repos (30d)", str(result["active_repos"]))
-        table.add_row("Commits (7 days)", str(result["total_commits_last_7_days"]))
-        table.add_row("Commits (30 days)", str(result["total_commits_last_30_days"]))
+        table.add_row("Total Events", str(result["total_events"]))
+        table.add_row("Active Repositories", str(result["active_repos"]))
+        table.add_row("Last Activity", str(result.get("last_activity") or "None"))
+        table.add_row("Status", status)
         console.print(table)
-        
-        if repo_activity:
-            rt = Table(title="Repository Activity (Top 10)")
-            rt.add_column("Repository", style="green")
-            rt.add_column("Commits (7d)", style="blue")
-            rt.add_column("Commits (30d)", style="magenta")
-            for ra in repo_activity:
-                rt.add_row(ra["repo"], str(ra["commits_7d"]), str(ra["commits_30d"]))
-            console.print(rt)
-    
-    except Exception as e:
+
+        ec = result.get("event_counts", {})
+        if ec:
+            bt = Table(title="Event Breakdown")
+            bt.add_column("Type", style="green")
+            bt.add_column("Count", style="magenta")
+            for k, v in sorted(ec.items(), key=lambda x: x[0]):
+                bt.add_row(k, str(v))
+            console.print(bt)
+
+        mar = result.get("most_active_repo")
+        if mar:
+            console.print(Panel.fit(f"Most Active Repo: {mar}", title="Highlight"))
+
+        if debug:
+            meta = Table(title="Debug")
+            meta.add_column("Key", style="blue")
+            meta.add_column("Value", style="white")
+            meta.add_row("Endpoint", f"/users/{username}/events/public")
+            meta.add_row("Timeout", f"{timeout}s")
+            if svc.rate_limit_remaining is not None:
+                meta.add_row("Rate Limit Remaining", str(svc.rate_limit_remaining))
+            if svc.rate_limit_reset is not None:
+                try:
+                    reset_dt = datetime.utcfromtimestamp(svc.rate_limit_reset).strftime("%Y-%m-%dT%H:%M:%SZ")
+                except Exception:
+                    reset_dt = str(svc.rate_limit_reset)
+                meta.add_row("Rate Limit Reset", reset_dt)
+            console.print(meta)
+
+        if result["total_events"] == 0:
+            console.print("[yellow]No recent public activity in the selected window.[/yellow]")
+
+    except RateLimitExceeded as e:
+        console.print(f"[red][!] {str(e)}[/red]")
+        console.print("[yellow]Tip: Set GITHUB_TOKEN env var to increase rate limit (5000 req/hour).[/yellow]")
+        raise typer.Exit(code=1)
+    except requests.exceptions.HTTPError as e:
+        status = getattr(e.response, "status_code", None)
+        if status == 404:
+            console.print("[red]User not found. Please check the username.[/red]")
+            raise typer.Exit(code=1)
+        typer.echo(f"HTTP Error: {e}")
+        raise typer.Exit(code=1)
+    except requests.exceptions.RequestException as e:
+        console.print("[red]Network error or timeout. Using cache if available.[/red]")
         typer.echo(f"Error: {e}")
         raise typer.Exit(code=1)
 

@@ -1,5 +1,5 @@
 ##############################
-# Markdown
+# Markdown - exclude all except README
 ##############################
 *.md
 !README.md

@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 import requests
@@ -55,6 +56,13 @@ class GitHubService:
         # Track rate limit info
         self.rate_limit_reset = None
         self.rate_limit_remaining = None
+
+    # --------------- Events Models ---------------
+    @dataclass
+    class ParsedEvent:
+        type: str
+        repo: Optional[str]
+        created_at: str
 
     # --------------- Helpers ---------------
     def _cache_key(self, key: str) -> Path:
@@ -154,6 +162,101 @@ class GitHubService:
                     resp._content = json.dumps(cached).encode("utf-8")
                     return resp
             raise
+
+    # --------------- Public Events ---------------
+    def get_user_public_events(self, username: str, per_page: int = 100, force_refresh: bool = False) -> List[Dict]:
+        url = f"{GITHUB_API_BASE}/users/{username}/events/public"
+        resp = self._get(url, params={"per_page": per_page}, force_refresh=force_refresh)
+        return resp.json()
+
+    @staticmethod
+    def _normalize_event_type(event_type: str) -> Optional[str]:
+        mapping = {
+            "PushEvent": "push",
+            "PullRequestEvent": "pull_request",
+            "IssuesEvent": "issues",
+            "IssueCommentEvent": "issue_comment",
+            "WatchEvent": "stars",
+            "ForkEvent": "fork",
+            "CreateEvent": "create",
+            "DeleteEvent": "delete",
+            "ReleaseEvent": "release",
+            "PullRequestReviewEvent": "pull_request_review",
+            "PullRequestReviewCommentEvent": "pull_request_review_comment",
+            "CommitCommentEvent": "commit_comment",
+            "MemberEvent": "member",
+            "PublicEvent": "public",
+            "GollumEvent": "gollum",
+        }
+        return mapping.get(event_type)
+
+    @staticmethod
+    def _event_allowed_filter(ev_type: str, filters: Optional[List[str]]) -> bool:
+        if not filters:
+            return True
+        synonyms = {
+            "pr": "pull_request",
+            "stars": "stars",
+            "watch": "stars",
+            "issue": "issues",
+            "issue_comment": "issue_comment",
+            "review": "pull_request_review",
+            "review_comment": "pull_request_review_comment",
+        }
+        normalized_filters = set(synonyms.get(f, f) for f in filters)
+        return ev_type in normalized_filters
+
+    def parse_and_summarize_events(
+        self,
+        raw_events: List[Dict],
+        since_days: int = 30,
+        filters: Optional[List[str]] = None,
+    ) -> Dict:
+        # Convert to parsed events and apply window
+        window_start = datetime.utcnow() - timedelta(days=since_days)
+        parsed: List[GitHubService.ParsedEvent] = []
+        for e in raw_events:
+            etype = self._normalize_event_type(e.get("type", ""))
+            if not etype:
+                continue
+            repo_name = (e.get("repo") or {}).get("name")
+            created_at = e.get("created_at")
+            if not created_at:
+                continue
+            try:
+                created_dt = datetime.strptime(created_at, "%Y-%m-%dT%H:%M:%SZ")
+            except ValueError:
+                continue
+            if created_dt < window_start:
+                continue
+            parsed.append(GitHubService.ParsedEvent(type=etype, repo=repo_name, created_at=created_at))
+
+        # Apply type filters
+        if filters:
+            parsed = [p for p in parsed if self._event_allowed_filter(p.type, filters)]
+
+        total_events = len(parsed)
+        event_counts: Dict[str, int] = {}
+        repo_counts: Dict[str, int] = {}
+        last_activity = None
+        for p in parsed:
+            event_counts[p.type] = event_counts.get(p.type, 0) + 1
+            if p.repo:
+                repo_counts[p.repo] = repo_counts.get(p.repo, 0) + 1
+            if (last_activity is None) or (p.created_at > last_activity):
+                last_activity = p.created_at
+
+        most_active_repo = None
+        if repo_counts:
+            most_active_repo = max(repo_counts.items(), key=lambda x: x[1])[0]
+
+        return {
+            "total_events": total_events,
+            "event_counts": event_counts,
+            "active_repos": len(repo_counts.keys()),
+            "last_activity": last_activity,
+            "most_active_repo": most_active_repo,
+        }
 
     def _languages_percent(self, lang_bytes: Dict[str, int]) -> Dict[str, float]:
         total = sum(lang_bytes.values())
