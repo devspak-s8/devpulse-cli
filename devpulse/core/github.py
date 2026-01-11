@@ -2,7 +2,7 @@ import time
 import json
 import os
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Literal
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -63,6 +63,28 @@ class GitHubService:
         type: str
         repo: Optional[str]
         created_at: str
+
+    # --------------- Pull Request Models ---------------
+    @dataclass
+    class MergeStatus:
+        mergeable: Optional[bool]
+        mergeable_state: Optional[str]  # clean | dirty | blocked | unstable | unknown
+        ci_status: Optional[str]        # success | failure | pending | none
+
+    @dataclass
+    class PullRequest:
+        number: int
+        title: str
+        author: Optional[str]
+        base_ref: Optional[str]
+        head_ref: Optional[str]
+        base_sha: Optional[str]
+        head_sha: Optional[str]
+        updated_at: Optional[str]
+        html_url: Optional[str]
+        merge: "GitHubService.MergeStatus"
+        commits_count: Optional[int] = None
+        files_changed: Optional[int] = None
 
     # --------------- Helpers ---------------
     def _cache_key(self, key: str) -> Path:
@@ -161,6 +183,28 @@ class GitHubService:
                     resp.status_code = 200
                     resp._content = json.dumps(cached).encode("utf-8")
                     return resp
+            raise
+
+    def _put(self, url: str, json_body: Optional[Dict] = None) -> requests.Response:
+        """
+        PUT request with rate limit handling. No caching is applied to mutations.
+        """
+        try:
+            resp = self.session.put(url, json=json_body or {}, timeout=self.timeout)
+
+            # Rate limit info
+            if "X-RateLimit-Remaining" in resp.headers:
+                self.rate_limit_remaining = int(resp.headers.get("X-RateLimit-Remaining", 0))
+            if "X-RateLimit-Reset" in resp.headers:
+                self.rate_limit_reset = int(resp.headers.get("X-RateLimit-Reset", 0))
+
+            if resp.status_code == 403:
+                reset_at = self.rate_limit_reset or int(time.time()) + 3600
+                raise RateLimitExceeded(reset_at, self.rate_limit_remaining or 0)
+
+            resp.raise_for_status()
+            return resp
+        except requests.exceptions.RequestException:
             raise
 
     # --------------- Public Events ---------------
@@ -409,6 +453,165 @@ class GitHubService:
             "merged_pull_requests": merged_prs,
             "avg_merge_time_hours": avg_merge_time_hours,
         }
+
+    # --------------- Pull Requests API ---------------
+    def _combined_status(self, owner: str, name: str, sha: str, force_refresh: bool = False) -> Optional[str]:
+        """Return combined CI status for a commit SHA (success|failure|pending|none)."""
+        url = f"{GITHUB_API_BASE}/repos/{owner}/{name}/commits/{sha}/status"
+        try:
+            data = self._get(url, force_refresh=force_refresh).json()
+            state = data.get("state")  # success | failure | pending | null
+            return state or "none"
+        except requests.HTTPError:
+            return None
+
+    def _parse_merge_status(self, pr_data: Dict, owner: str, name: str, force_refresh: bool = False) -> "GitHubService.MergeStatus":
+        mergeable = pr_data.get("mergeable")
+        mergeable_state = pr_data.get("mergeable_state")
+        head_sha = (pr_data.get("head") or {}).get("sha")
+        ci_status = self._combined_status(owner, name, head_sha, force_refresh=force_refresh) if head_sha else None
+        return GitHubService.MergeStatus(
+            mergeable=mergeable,
+            mergeable_state=mergeable_state,
+            ci_status=ci_status,
+        )
+
+    def get_pull_request(self, owner: str, name: str, number: int, force_refresh: bool = False) -> "GitHubService.PullRequest":
+        """
+        Fetch a single pull request with mergeability and summary info.
+        """
+        url = f"{GITHUB_API_BASE}/repos/{owner}/{name}/pulls/{number}"
+        pr = self._get(url, force_refresh=force_refresh).json()
+
+        files_url = f"{GITHUB_API_BASE}/repos/{owner}/{name}/pulls/{number}/files"
+        files = self._get(files_url, params={"per_page": 100}, force_refresh=force_refresh).json()
+        files_changed = len(files) if isinstance(files, list) else None
+
+        ms = self._parse_merge_status(pr, owner, name, force_refresh=force_refresh)
+
+        return GitHubService.PullRequest(
+            number=pr.get("number"),
+            title=pr.get("title"),
+            author=(pr.get("user") or {}).get("login"),
+            base_ref=(pr.get("base") or {}).get("ref"),
+            head_ref=(pr.get("head") or {}).get("ref"),
+            base_sha=(pr.get("base") or {}).get("sha"),
+            head_sha=(pr.get("head") or {}).get("sha"),
+            updated_at=pr.get("updated_at"),
+            html_url=pr.get("html_url"),
+            merge=ms,
+            commits_count=pr.get("commits"),
+            files_changed=files_changed,
+        )
+
+    def list_pull_requests(
+        self,
+        owner: str,
+        name: str,
+        state: Literal["open", "closed", "all"] = "open",
+        force_refresh: bool = False,
+    ) -> List["GitHubService.PullRequest"]:
+        """
+        List PRs for a repository and include mergeability/CI status for each.
+        """
+        pulls_url = f"{GITHUB_API_BASE}/repos/{owner}/{name}/pulls"
+        pr_list = self._get(pulls_url, params={"state": state, "per_page": 50, "sort": "updated", "direction": "desc"}, force_refresh=force_refresh).json()
+        results: List[GitHubService.PullRequest] = []
+        for pr in pr_list:
+            number = pr.get("number")
+            # Fetch detailed PR to obtain mergeable fields
+            detailed = self._get(f"{GITHUB_API_BASE}/repos/{owner}/{name}/pulls/{number}", force_refresh=force_refresh).json()
+            ms = self._parse_merge_status(detailed, owner, name, force_refresh=force_refresh)
+            results.append(GitHubService.PullRequest(
+                number=number,
+                title=pr.get("title"),
+                author=(pr.get("user") or {}).get("login"),
+                base_ref=(pr.get("base") or {}).get("ref"),
+                head_ref=(pr.get("head") or {}).get("ref"),
+                base_sha=(pr.get("base") or {}).get("sha"),
+                head_sha=(pr.get("head") or {}).get("sha"),
+                updated_at=pr.get("updated_at"),
+                html_url=pr.get("html_url"),
+                merge=ms,
+            ))
+        return results
+
+    def _check_permissions(self, owner: str, name: str) -> bool:
+        """
+        Validate authenticated user's permissions on the repo.
+        Requires token; returns True if user has push/maintain/admin permissions.
+        """
+        url = f"{GITHUB_API_BASE}/repos/{owner}/{name}"
+        data = self._get(url, force_refresh=True).json()
+        perms = data.get("permissions") or {}
+        return bool(perms.get("push") or perms.get("maintain") or perms.get("admin"))
+
+    def merge_pull_request(
+        self,
+        owner: str,
+        name: str,
+        number: int,
+        strategy: Literal["merge", "squash", "rebase"] = "squash",
+        confirm: bool = False,
+        force_checks: bool = False,
+        dry_run: bool = False,
+    ) -> Dict:
+        """
+        Merge a PR safely. Requires authentication and confirmation. Refuses conflicts.
+        """
+        if not self.token:
+            raise PermissionError(
+                "Authentication required. Set GITHUB_TOKEN with repo permissions to merge pull requests."
+            )
+
+        # Verify permissions on repo
+        if not self._check_permissions(owner, name):
+            raise PermissionError(
+                "Authentication required. Set GITHUB_TOKEN with repo permissions to merge pull requests."
+            )
+
+        # Fetch PR detail and current status
+        pr = self.get_pull_request(owner, name, number, force_refresh=True)
+
+        # Conflict detection
+        mergeable_state = (pr.merge.mergeable_state or "unknown").lower()
+        if mergeable_state == "dirty":
+            raise RuntimeError(f"PR #{number} has merge conflicts and cannot be merged.")
+
+        # CI failing
+        if mergeable_state == "blocked" and not force_checks:
+            raise RuntimeError("Checks are failing. Use --force to override (conflicts still refuse).")
+
+        result = {
+            "repo": f"{owner}/{name}",
+            "pr_number": number,
+            "mergeable": bool(pr.merge.mergeable),
+            "mergeable_state": mergeable_state,
+            "head_sha": pr.head_sha,
+            "base_sha": pr.base_sha,
+            "merged": False,
+            "strategy": strategy,
+            "dry_run": dry_run,
+        }
+
+        if dry_run:
+            return result
+
+        if not confirm:
+            raise RuntimeError("Merge requires --confirm flag.")
+
+        # Perform merge via GitHub API (guard with current head SHA)
+        merge_url = f"{GITHUB_API_BASE}/repos/{owner}/{name}/pulls/{number}/merge"
+        body = {"merge_method": strategy}
+        if pr.head_sha:
+            body["sha"] = pr.head_sha
+        resp = self._put(merge_url, json_body=body).json()
+
+        merged = bool(resp.get("merged"))
+        message = resp.get("message")
+        result["merged"] = merged
+        result["message"] = message
+        return result
 
     def get_contributors(self, owner: str, name: str, top_n: int = 10, force_refresh: bool = False) -> Dict:
         url = f"{GITHUB_API_BASE}/repos/{owner}/{name}/contributors"

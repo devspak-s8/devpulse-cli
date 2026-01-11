@@ -1,3 +1,4 @@
+import os
 import typer
 import json as json_lib
 from typing import Optional, List
@@ -12,6 +13,47 @@ from devpulse.core.github import GitHubService, RateLimitExceeded
 
 app = typer.Typer(help="GitHub integration and statistics")
 console = Console()
+
+
+# --------------- Validation & Token Management ---------------
+def _validate_repo_format(repo: str) -> tuple[str, str]:
+    """Validate and parse repo in 'owner/name' format. Raise exit on failure."""
+    if not repo or "/" not in repo:
+        console.print("[red]❌ Invalid repository format.[/red]")
+        console.print("[yellow]Usage: devpulse github <command> owner/name[/yellow]")
+        raise typer.Exit(code=1)
+    parts = repo.split("/")
+    if len(parts) != 2 or not parts[0] or not parts[1]:
+        console.print("[red]❌ Repository must be in 'owner/name' format.[/red]")
+        console.print("[yellow]Example: devpulse github prs octocat/Hello-World[/yellow]")
+        raise typer.Exit(code=1)
+    return parts[0], parts[1]
+
+
+def _validate_and_set_token(require_auth: bool = False) -> Optional[str]:
+    """Validate and set GITHUB_TOKEN. If missing and required, prompt the user securely.
+    Returns the token or None. Exits if required but unavailable."""
+    token = os.getenv("GITHUB_TOKEN")
+    if token:
+        return token  # Already set
+    
+    if not require_auth:
+        return None  # Auth not required yet
+    
+    # Auth required: prompt user
+    console.print("[yellow]🔐 Authentication required for this operation.[/yellow]")
+    console.print("[cyan]A GitHub token with 'repo' scope is needed.[/cyan]")
+    console.print("[dim]Create one at: https://github.com/settings/tokens[/dim]\n")
+    
+    while True:
+        token = typer.prompt("Enter GITHUB_TOKEN", hide_input=True)
+        if token and token.strip():
+            os.environ["GITHUB_TOKEN"] = token.strip()
+            console.print("[green]✓ Token set.[/green]")
+            return token.strip()
+        else:
+            console.print("[red]❌ Token cannot be empty.[/red]")
+            console.print("[yellow]Please try again.[/yellow]")
 
 
 def _get_health_color(score: int) -> str:
@@ -397,6 +439,344 @@ def contributors(
     
     except Exception as e:
         typer.echo(f"Error: {e}")
+        raise typer.Exit(code=1)
+
+
+# ----------------- Pull Request Management -----------------
+
+@app.command()
+def prs(
+    repo: str = typer.Argument(..., help="Repository in 'owner/name' format"),
+    state: str = typer.Option("open", "--state", help="PR state: open | closed | all"),
+    conflicts_only: bool = typer.Option(False, "--conflicts-only", help="Show only PRs with merge conflicts"),
+    json: bool = typer.Option(False, "--json", help="Output machine-readable JSON"),
+    debug: bool = typer.Option(False, "--debug", help="Show API request/response metadata"),
+    force_refresh: bool = typer.Option(False, "--force-refresh", help="Bypass cache"),
+):
+    """List pull requests for a repository with mergeability and CI status."""
+    # Validate inputs
+    owner, name = _validate_repo_format(repo)
+    
+    svc = GitHubService()
+    try:
+        state_norm = state.lower()
+        if state_norm not in {"open", "closed", "all"}:
+            console.print("[red]❌ Invalid --state option.[/red]")
+            console.print("[yellow]Use one of: open | closed | all[/yellow]")
+            raise typer.Exit(code=1)
+
+        prs_list = svc.list_pull_requests(owner, name, state=state_norm, force_refresh=force_refresh)
+        if conflicts_only:
+            prs_list = [p for p in prs_list if (p.merge.mergeable_state or "").lower() == "dirty"]
+
+        # JSON output
+        if json:
+            payload = [
+                {
+                    "repo": repo,
+                    "pr_number": p.number,
+                    "title": p.title,
+                    "author": p.author,
+                    "base": f"{p.base_ref}",
+                    "head": f"{p.head_ref}",
+                    "mergeable": p.merge.mergeable,
+                    "mergeable_state": p.merge.mergeable_state,
+                    "ci_status": p.merge.ci_status,
+                    "updated_at": p.updated_at,
+                    "head_sha": p.head_sha,
+                }
+                for p in prs_list
+            ]
+            _output_json({"repository": repo, "state": state_norm, "pull_requests": payload})
+            return
+
+        # Rich output
+        console.print(Panel.fit(f"Pull Requests: {repo}", title="Repository"))
+        table = Table(title=f"PRs ({state_norm})")
+        table.add_column("Number", style="cyan", no_wrap=True)
+        table.add_column("Title", style="magenta")
+        table.add_column("Author", style="green")
+        table.add_column("Base → Head", style="yellow")
+        table.add_column("State", style="white")
+        table.add_column("CI", style="white")
+        table.add_column("Updated", style="blue")
+        table.add_column("Head SHA", style="white")
+
+        for p in prs_list:
+            st = (p.merge.mergeable_state or "unknown").lower()
+            if st == "clean":
+                st_disp = "[green]clean[/green]"
+            elif st == "dirty":
+                st_disp = "[red]dirty[/red]"
+            elif st == "blocked":
+                st_disp = "[yellow]blocked[/yellow]"
+            else:
+                st_disp = "[dim]unknown[/dim]"
+
+            ci = (p.merge.ci_status or "none").lower()
+            if ci == "success":
+                ci_disp = "[green]success[/green]"
+            elif ci == "failure":
+                ci_disp = "[red]failure[/red]"
+            elif ci == "pending":
+                ci_disp = "[yellow]pending[/yellow]"
+            else:
+                ci_disp = "[dim]none[/dim]"
+
+            table.add_row(
+                str(p.number),
+                str(p.title or ""),
+                str(p.author or ""),
+                f"{p.base_ref} → {p.head_ref}",
+                st_disp,
+                ci_disp,
+                str(p.updated_at or ""),
+                str(p.head_sha or ""),
+            )
+        console.print(table)
+
+        if debug:
+            meta = Table(title="Debug")
+            meta.add_column("Key")
+            meta.add_column("Value")
+            meta.add_row("Endpoint", f"/repos/{owner}/{name}/pulls")
+            if svc.rate_limit_remaining is not None:
+                meta.add_row("Rate Limit Remaining", str(svc.rate_limit_remaining))
+            if svc.rate_limit_reset is not None:
+                try:
+                    reset_dt = datetime.utcfromtimestamp(svc.rate_limit_reset).strftime("%Y-%m-%dT%H:%M:%SZ")
+                except Exception:
+                    reset_dt = str(svc.rate_limit_reset)
+                meta.add_row("Rate Limit Reset", reset_dt)
+            console.print(meta)
+
+    except RateLimitExceeded as e:
+        console.print(f"[red]❌ {str(e)}[/red]")
+        console.print("[yellow]💡 Tip: Set GITHUB_TOKEN with repo scope to increase rate limit to 5000/hour.[/yellow]")
+        console.print("[dim]Create a token at: https://github.com/settings/tokens[/dim]")
+        raise typer.Exit(code=1)
+    except requests.exceptions.HTTPError as e:
+        status = getattr(e.response, "status_code", None)
+        if status == 404:
+            console.print(f"[red]❌ Repository not found: {repo}[/red]")
+            console.print("[yellow]Please check the owner and repository name.[/yellow]")
+        elif status == 403:
+            console.print(f"[red]❌ Access denied to repository: {repo}[/red]")
+            console.print("[yellow]Ensure the repository is public or you have access.[/yellow]")
+        else:
+            console.print(f"[red]❌ HTTP Error {status}: {e}[/red]")
+        raise typer.Exit(code=1)
+    except requests.exceptions.ConnectionError:
+        console.print("[red]❌ Network error: Unable to reach GitHub API.[/red]")
+        console.print("[yellow]Check your internet connection and try again.[/yellow]")
+        raise typer.Exit(code=1)
+    except requests.exceptions.Timeout:
+        console.print("[red]❌ Request timeout: GitHub API took too long to respond.[/red]")
+        console.print("[yellow]Try again in a moment or use --force-refresh.[/yellow]")
+        raise typer.Exit(code=1)
+    except requests.exceptions.RequestException as e:
+        console.print(f"[red]❌ Request failed: {e}[/red]")
+        raise typer.Exit(code=1)
+    except ValueError as e:
+        console.print(f"[red]❌ Validation error: {e}[/red]")
+        raise typer.Exit(code=1)
+
+
+pr_app = typer.Typer(help="Pull Request management")
+app.add_typer(pr_app, name="pr")
+
+
+@pr_app.command("view")
+def pr_view(
+    repo: str = typer.Argument(..., help="Repository in 'owner/name' format"),
+    pr_number: int = typer.Argument(..., help="Pull Request number"),
+    json: bool = typer.Option(False, "--json", help="Output machine-readable JSON"),
+    debug: bool = typer.Option(False, "--debug", help="Show API metadata"),
+    force_refresh: bool = typer.Option(False, "--force-refresh", help="Bypass cache"),
+):
+    """View details for a single pull request."""
+    # Validate inputs
+    owner, name = _validate_repo_format(repo)
+    if pr_number <= 0:
+        console.print("[red]❌ PR number must be a positive integer.[/red]")
+        raise typer.Exit(code=1)
+    
+    svc = GitHubService()
+    try:
+        pr = svc.get_pull_request(owner, name, pr_number, force_refresh=force_refresh)
+
+        if json:
+            _output_json({
+                "repo": repo,
+                "pr_number": pr.number,
+                "title": pr.title,
+                "author": pr.author,
+                "description": None,  # description not fetched to minimize calls
+                "files_changed": pr.files_changed,
+                "commit_count": pr.commits_count,
+                "base_sha": pr.base_sha,
+                "head_sha": pr.head_sha,
+                "mergeable": pr.merge.mergeable,
+                "mergeable_state": pr.merge.mergeable_state,
+                "ci_status": pr.merge.ci_status,
+            })
+            return
+
+        console.print(Panel.fit(f"PR #{pr.number}: {pr.title}", title="Pull Request"))
+        table = Table(title="Details")
+        table.add_column("Field", style="cyan")
+        table.add_column("Value", style="white")
+        table.add_row("Author", str(pr.author or ""))
+        table.add_row("Base", str(pr.base_ref or ""))
+        table.add_row("Head", str(pr.head_ref or ""))
+        table.add_row("Base SHA", str(pr.base_sha or ""))
+        table.add_row("Head SHA", str(pr.head_sha or ""))
+        table.add_row("Commits", str(pr.commits_count or ""))
+        table.add_row("Files Changed", str(pr.files_changed or ""))
+        st = (pr.merge.mergeable_state or "unknown").lower()
+        ci = (pr.merge.ci_status or "none").lower()
+        table.add_row("Mergeable State", st)
+        table.add_row("CI Status", ci)
+        console.print(table)
+
+        if debug:
+            meta = Table(title="Debug")
+            meta.add_column("Key")
+            meta.add_column("Value")
+            meta.add_row("Endpoint", f"/repos/{owner}/{name}/pulls/{pr_number}")
+            if svc.rate_limit_remaining is not None:
+                meta.add_row("Rate Limit Remaining", str(svc.rate_limit_remaining))
+            if svc.rate_limit_reset is not None:
+                try:
+                    reset_dt = datetime.utcfromtimestamp(svc.rate_limit_reset).strftime("%Y-%m-%dT%H:%M:%SZ")
+                except Exception:
+                    reset_dt = str(svc.rate_limit_reset)
+                meta.add_row("Rate Limit Reset", reset_dt)
+            console.print(meta)
+
+    except RateLimitExceeded as e:
+        console.print(f"[red]❌ {str(e)}[/red]")
+        console.print("[yellow]💡 Set GITHUB_TOKEN with repo scope to increase rate limit.[/yellow]")
+        raise typer.Exit(code=1)
+    except requests.exceptions.HTTPError as e:
+        status = getattr(e.response, "status_code", None)
+        if status == 404:
+            console.print(f"[red]❌ PR #{pr_number} not found in {repo}[/red]")
+            console.print("[yellow]Check the PR number and repository name.[/yellow]")
+        elif status == 403:
+            console.print(f"[red]❌ Access denied to repository: {repo}[/red]")
+        else:
+            console.print(f"[red]❌ HTTP Error {status}: {e}[/red]")
+        raise typer.Exit(code=1)
+    except requests.exceptions.ConnectionError:
+        console.print("[red]❌ Network error: Unable to reach GitHub API.[/red]")
+        console.print("[yellow]Check your internet connection.[/yellow]")
+        raise typer.Exit(code=1)
+    except requests.exceptions.Timeout:
+        console.print("[red]❌ Request timeout: GitHub API took too long to respond.[/red]")
+        raise typer.Exit(code=1)
+    except requests.exceptions.RequestException as e:
+        console.print(f"[red]❌ Request failed: {e}[/red]")
+        raise typer.Exit(code=1)
+    except ValueError as e:
+        console.print(f"[red]❌ Validation error: {e}[/red]")
+        raise typer.Exit(code=1)
+
+
+@pr_app.command("merge")
+def pr_merge(
+    repo: str = typer.Argument(..., help="Repository in 'owner/name' format"),
+    pr_number: int = typer.Argument(..., help="Pull Request number"),
+    strategy: str = typer.Option("squash", "--strategy", help="merge | squash | rebase"),
+    confirm: bool = typer.Option(False, "--confirm", help="Confirm merge operation (REQUIRED)"),
+    force: bool = typer.Option(False, "--force", help="Override failing checks (conflicts still refuse)"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would happen without merging"),
+    json: bool = typer.Option(False, "--json", help="Output machine-readable JSON"),
+):
+    """Merge a pull request safely with confirmation and auth checks."""
+    # Validate inputs
+    owner, name = _validate_repo_format(repo)
+    if pr_number <= 0:
+        console.print("[red]❌ PR number must be a positive integer.[/red]")
+        raise typer.Exit(code=1)
+    
+    st = strategy.lower()
+    if st not in {"merge", "squash", "rebase"}:
+        console.print("[red]❌ Invalid --strategy option.[/red]")
+        console.print("[yellow]Use one of: merge | squash | rebase[/yellow]")
+        raise typer.Exit(code=1)
+    
+    # Prompt for token if required (always needed for merge)
+    _validate_and_set_token(require_auth=True)
+    
+    svc = GitHubService()
+    try:
+        result = svc.merge_pull_request(owner, name, pr_number, strategy=st, confirm=confirm, force_checks=force, dry_run=dry_run)
+
+        if json:
+            _output_json(result)
+            return
+
+        # Rich output
+        console.print(Panel.fit(f"Merge PR #{pr_number}", title="Operation"))
+        table = Table(title="Summary")
+        table.add_column("Key", style="cyan")
+        table.add_column("Value", style="white")
+        table.add_row("Repository", repo)
+        table.add_row("PR Number", str(pr_number))
+        table.add_row("Strategy", st)
+        table.add_row("Mergeable State", str(result.get("mergeable_state")))
+        table.add_row("Head SHA", str(result.get("head_sha") or ""))
+        table.add_row("Base SHA", str(result.get("base_sha") or ""))
+        table.add_row("Dry Run", "Yes" if dry_run else "No")
+        table.add_row("Merged", "Yes" if result.get("merged") else "No")
+        message = result.get("message")
+        if message:
+            table.add_row("Message", str(message))
+        console.print(table)
+
+    except PermissionError as e:
+        console.print(f"[red]❌ {str(e)}[/red]")
+        console.print("[yellow]💡 Create a token at: https://github.com/settings/tokens[/yellow]")
+        console.print("[yellow]Required scopes: repo (full control of private repositories)[/yellow]")
+        raise typer.Exit(code=1)
+    except RuntimeError as e:
+        msg = str(e)
+        if "conflicts" in msg.lower():
+            console.print("[red]❌ Merge blocked: PR has merge conflicts.[/red]")
+            console.print("[yellow]Resolve conflicts in the branch and try again.[/yellow]")
+        else:
+            console.print(f"[red]❌ {msg}[/red]")
+        raise typer.Exit(code=1)
+    except RateLimitExceeded as e:
+        console.print(f"[red]❌ {str(e)}[/red]")
+        console.print("[yellow]💡 Upgrade your token or try again after the reset time.[/yellow]")
+        raise typer.Exit(code=1)
+    except requests.exceptions.HTTPError as e:
+        status = getattr(e.response, "status_code", None)
+        if status == 404:
+            console.print(f"[red]❌ PR #{pr_number} or repository {repo} not found.[/red]")
+        elif status == 403:
+            console.print(f"[red]❌ Insufficient permissions to merge PR.[/red]")
+            console.print("[yellow]Ensure your token has repo scope and push access.[/yellow]")
+        elif status == 409:
+            console.print(f"[red]❌ PR #{pr_number} cannot be merged (status issue).[/red]")
+            console.print("[yellow]Check if PR is already merged or has blocking conditions.[/yellow]")
+        else:
+            console.print(f"[red]❌ HTTP Error {status}: {e}[/red]")
+        raise typer.Exit(code=1)
+    except requests.exceptions.ConnectionError:
+        console.print("[red]❌ Network error: Unable to reach GitHub API.[/red]")
+        console.print("[yellow]Check your internet connection.[/yellow]")
+        raise typer.Exit(code=1)
+    except requests.exceptions.Timeout:
+        console.print("[red]❌ Request timeout: GitHub API took too long to respond.[/red]")
+        raise typer.Exit(code=1)
+    except requests.exceptions.RequestException as e:
+        console.print(f"[red]❌ Request failed: {e}[/red]")
+        raise typer.Exit(code=1)
+    except ValueError as e:
+        console.print(f"[red]❌ Validation error: {e}[/red]")
         raise typer.Exit(code=1)
 
 
