@@ -9,7 +9,7 @@ README = (BASE_DIR / "README.md").read_text(encoding="utf-8") if (BASE_DIR / "RE
 
 setup(
     name="devpulse-cli",  # PyPI name ("devpulse" is taken)
-    version="0.2.0",
+    version="0.2.1",
     packages=find_packages(),
     include_package_data=True,
     # Keep core install fast; heavy deps moved to extras

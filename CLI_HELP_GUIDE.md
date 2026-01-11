@@ -847,6 +847,94 @@ devpulse stats report --format html --output week-report.html
 
 ---
 
+### 🔗 GitHub Command Group
+**Purpose:** GitHub integration, analytics, and PR management
+
+#### github stats
+```bash
+devpulse github stats --repo owner/name              # Repository statistics
+devpulse github stats --username torvalds            # User statistics
+devpulse github stats --repo owner/name --json       # JSON output
+devpulse github stats --repo owner/name --include health,contributors
+```
+
+#### github activity
+```bash
+devpulse github activity username                    # User activity
+devpulse github activity username --events push,pr   # Filter events
+devpulse github activity username --since 7d         # Last 7 days
+devpulse github activity username --json             # JSON format
+devpulse github activity username --debug            # Show rate limit info
+```
+
+#### github contributors
+```bash
+devpulse github contributors owner/repo              # Top contributors
+devpulse github contributors owner/repo --top 5      # Show top 5
+devpulse github contributors owner/repo --json       # JSON output
+```
+
+#### github top-languages
+```bash
+devpulse github top-languages owner/repo             # Language breakdown
+devpulse github top-languages owner/repo --json      # JSON output
+```
+
+#### github prs (List Pull Requests) ✨ NEW
+```bash
+devpulse github prs owner/repo                       # List open PRs
+devpulse github prs owner/repo --state all           # All PRs (open + closed)
+devpulse github prs owner/repo --state closed        # Closed PRs only
+devpulse github prs owner/repo --conflicts-only      # Only conflicted PRs
+devpulse github prs owner/repo --json                # JSON output
+devpulse github prs owner/repo --debug               # Show rate limit info
+devpulse github prs owner/repo --force-refresh       # Bypass cache
+```
+
+Shows PR number, title, author, base/head branches, mergeability state, CI status, and head SHA.
+
+#### github pr view (View Single PR) ✨ NEW
+```bash
+devpulse github pr view owner/repo 123               # View PR details
+devpulse github pr view owner/repo 123 --json        # JSON output
+devpulse github pr view owner/repo 123 --debug       # Show API metadata
+devpulse github pr view owner/repo 123 --force-refresh
+```
+
+Displays: title, author, files changed, commits, SHAs, mergeability, conflict status, CI status.
+
+#### github pr merge (Merge Pull Request) ✨ NEW
+```bash
+# Preview merge (no token needed if env var set)
+devpulse github pr merge owner/repo 123 --dry-run --json
+
+# Squash merge (default strategy)
+devpulse github pr merge owner/repo 123 --strategy squash --confirm
+
+# Full merge
+devpulse github pr merge owner/repo 123 --strategy merge --confirm
+
+# Rebase merge
+devpulse github pr merge owner/repo 123 --strategy rebase --confirm
+
+# Override failing CI checks (conflicts still block)
+devpulse github pr merge owner/repo 123 --strategy squash --confirm --force
+
+# Interactive token prompt (if GITHUB_TOKEN not set)
+devpulse github pr merge owner/repo 123 --confirm
+# Enter GITHUB_TOKEN with repo scope when prompted (hidden input)
+```
+
+**Merge Safety Features:**
+- ✅ Conflicts block merge (mergeable_state: dirty)
+- ✅ Requires `--confirm` flag (no accidental merges)
+- ✅ Permission validation (token must have repo scope)
+- ✅ CI status awareness (--force overrides failures, not conflicts)
+- ✅ `--dry-run` shows what would happen without merging
+- ✅ Uses current head SHA (prevents race conditions)
+
+---
+
 ## Tips & Tricks
 
 1. **Use aliases for frequently used commands:**

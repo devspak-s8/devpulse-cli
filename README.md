@@ -30,6 +30,7 @@ A comprehensive command-line tool for developer productivity tracking, system mo
 - **GitHub Activity** - Public user activity tracking and event analysis
 - **GitHub Contributors** - Contributor analysis and rankings
 - **GitHub Issues** - Issue metrics and trend analysis
+- **GitHub Pull Requests** - List, view, and merge PRs with conflict detection and safe merge operations
 
 ### Data Management
 - **Config** - Configuration management
@@ -113,6 +114,22 @@ devpulse github activity torvalds --debug
 
 # Repository health analysis
 devpulse github stats --repo microsoft/vscode --include health,contributors
+
+# List pull requests
+devpulse github prs owner/repo                           # List open PRs
+devpulse github prs owner/repo --state all              # All PRs (open + closed)
+devpulse github prs owner/repo --conflicts-only         # Only conflicted PRs
+devpulse github prs owner/repo --json                   # JSON output
+
+# View single PR details
+devpulse github pr view owner/repo 123                  # View PR #123
+devpulse github pr view owner/repo 123 --json           # JSON format
+
+# Merge a pull request (interactive auth prompt)
+devpulse github pr merge owner/repo 123 --dry-run       # Preview merge
+devpulse github pr merge owner/repo 123 --strategy squash --confirm  # Squash merge
+devpulse github pr merge owner/repo 123 --strategy merge --confirm   # Full merge
+devpulse github pr merge owner/repo 123 --confirm --force            # Override failing checks
 ```
 
 ### Productivity Reports
