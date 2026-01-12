@@ -8,8 +8,21 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich.text import Text
+from rich.syntax import Syntax
 
 from devpulse.core.github import GitHubService, RateLimitExceeded
+from devpulse.commands.github_readme import (
+    ReadmeGenerator,
+    RepositoryContextCollector,
+    validate_readme_not_exists,
+    save_readme,
+)
+from devpulse.commands.github_commit import (
+    GitStatusCollector,
+    ConventionalCommitGenerator,
+    CommitMessageValidator,
+    apply_commit_message,
+)
 
 app = typer.Typer(help="GitHub integration and statistics")
 console = Console()
@@ -100,13 +113,13 @@ def _filter_stats(stats: dict, include: Optional[str]) -> dict:
 def stats(
     username: Optional[str] = typer.Option(None, "--username", "-u", help="GitHub username"),
     repo: Optional[str] = typer.Option(None, "--repo", "-r", help="Repository in 'owner/name' format"),
-    include_health: bool = typer.Option(True, "--health/--no-health", help="Include health score"),
-    include_contributors: bool = typer.Option(True, "--contributors/--no-contributors", help="Include contributors section"),
-    include_activity: bool = typer.Option(True, "--activity/--no-activity", help="Include commit activity"),
+    include_health: bool = typer.Option(False, "--health", help="Include health score"),
+    include_contributors: bool = typer.Option(False, "--contributors", help="Include contributors section"),
+    include_activity: bool = typer.Option(False, "--activity", help="Include commit activity"),
     top_repos_for_user: int = typer.Option(3, "--top", help="Number of top repos for a user"),
     json: bool = typer.Option(False, "--json", help="Output as JSON"),
     include: Optional[str] = typer.Option(None, "--include", help="Comma-separated sections to include (contributors,issues,activity,languages,health,prs)"),
-    force_refresh: bool = typer.Option(False, "--force-refresh", help="Bypass cache and force fresh API call"),
+    force_refresh: bool = typer.Option(False, "--refresh", help="Bypass cache and force fresh API call"),
 ):
     """Fetch and display GitHub statistics for a repo or user."""
     if not username and not repo:
@@ -832,3 +845,169 @@ def issues(
     except Exception as e:
         typer.echo(f"Error: {e}")
         raise typer.Exit(code=1)
+
+
+# --------------- README Generator ---------------
+
+@app.command()
+def readme(
+    repo: Optional[str] = typer.Option(None, "--repo", "-r", help="Repository path or 'owner/name' for remote"),
+    preview: bool = typer.Option(False, "--preview", help="Print preview only (don't save)", is_flag=True),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Custom output file path"),
+    readme_style: str = typer.Option("standard", "--template", "-t", help="README style (minimal, standard, detailed)"),
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation and write directly", is_flag=True),
+):
+    """Generate professional README.md files for GitHub repositories."""
+    
+    try:
+        # Determine repo path
+        repo_path = repo or "."
+        
+        # Collect repository context
+        console.print("[cyan]📚 Collecting repository context...[/cyan]")
+        try:
+            context = RepositoryContextCollector.collect_local(repo_path)
+        except ValueError as e:
+            console.print(f"[red]Error: {e}[/red]")
+            raise typer.Exit(code=1)
+        
+        # Generate README content
+        console.print("[cyan]✍️  Generating README content...[/cyan]")
+        generator = ReadmeGenerator()
+        readme_content = generator.generate(context, style=readme_style)
+        
+        # Preview
+        console.print("\n" + "=" * 70)
+        console.print("[bold cyan]README PREVIEW[/bold cyan]")
+        console.print("=" * 70)
+        console.print(Syntax(readme_content, "markdown", theme="monokai"))
+        console.print("=" * 70)
+        
+        # Handle preview-only mode
+        if preview:
+            console.print("[green]✓ Preview complete (use without --preview to save)[/green]")
+            return
+        
+        # Validate no overwrite (or force)
+        if not force:
+            if not validate_readme_not_exists(repo_path, output):
+                console.print("[yellow]Cancelled.[/yellow]")
+                raise typer.Exit(code=0)
+        
+        # Ask for confirmation
+        if not force:
+            confirm = typer.confirm("Write this to README.md?", default=True)
+            if not confirm:
+                console.print("[yellow]Cancelled.[/yellow]")
+                raise typer.Exit(code=0)
+        
+        # Save README
+        try:
+            target_path = save_readme(readme_content, repo_path, output)
+            console.print(f"[green]✓ README saved to {target_path}[/green]")
+        except (PermissionError, ValueError) as e:
+            console.print(f"[red]Error saving README: {e}[/red]")
+            raise typer.Exit(code=1)
+    
+    except typer.Exit:
+        raise
+    except Exception as e:
+        console.print(f"[red]Unexpected error: {e}[/red]")
+        raise typer.Exit(code=1)
+
+
+# --------------- Commit Message Generator ---------------
+
+@app.command()
+def commit(
+    repo: Optional[str] = typer.Option(None, "--repo", "-r", help="Repository path (default: current directory)"),
+    message_type: str = typer.Option("feat", "--type", help="Commit type (feat, fix, docs, chore, etc.)"),
+    scope: Optional[str] = typer.Option(None, "--scope", "-s", help="Commit scope (auth, api, ui, etc.)"),
+    breaking: bool = typer.Option(False, "--breaking", help="Mark as breaking change"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show commit message without executing git commit"),
+    conventional: bool = typer.Option(True, "--conventional", help="Use conventional commit format"),
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation and commit directly"),
+):
+    """Generate and apply conventional commit messages."""
+    
+    try:
+        repo_path = repo or "."
+        
+        # Validate git repository
+        console.print("[cyan]🔍 Checking repository status...[/cyan]")
+        try:
+            git_status = GitStatusCollector.collect(repo_path)
+        except ValueError as e:
+            console.print(f"[red]Error: {e}[/red]")
+            raise typer.Exit(code=1)
+        
+        # Check for changes
+        if not git_status.has_changes:
+            console.print("[yellow]⚠️  No changes detected in repository[/yellow]")
+            console.print("[dim]Stage changes with 'git add' and try again[/dim]")
+            raise typer.Exit(code=0)
+        
+        # Validate commit type
+        if message_type not in ConventionalCommitGenerator.VALID_TYPES:
+            console.print(f"[red]Invalid commit type: {message_type}[/red]")
+            console.print(f"[yellow]Valid types: {', '.join(ConventionalCommitGenerator.VALID_TYPES)}[/yellow]")
+            raise typer.Exit(code=1)
+        
+        # Generate commit message
+        console.print("[cyan]✍️  Generating commit message...[/cyan]")
+        generator = ConventionalCommitGenerator()
+        commit_msg = generator.generate(
+            git_status,
+            commit_type=message_type,
+            scope=scope,
+            breaking=breaking,
+            dry_run=dry_run
+        )
+        
+        # Display message preview
+        console.print("\n" + "=" * 70)
+        console.print("[bold cyan]COMMIT MESSAGE[/bold cyan]")
+        console.print("=" * 70)
+        console.print(Syntax(commit_msg, "plaintext", theme="monokai"))
+        console.print("=" * 70)
+        
+        # Show file changes summary
+        if git_status.diff_stat:
+            console.print("\n[bold cyan]CHANGES SUMMARY[/bold cyan]")
+            console.print(git_status.diff_stat)
+        
+        # Validate message format
+        if conventional:
+            is_valid, error_msg = CommitMessageValidator.validate_conventional(commit_msg)
+            if not is_valid:
+                console.print(f"[yellow]⚠️  Warning: {error_msg}[/yellow]")
+        
+        # Dry-run mode
+        if dry_run:
+            console.print("\n[green]✓ Dry run complete[/green]")
+            console.print("[dim]Run without --dry-run to execute commit[/dim]")
+            return
+        
+        # Ask for confirmation
+        if not force:
+            confirm = typer.confirm("Apply this commit message?", default=True)
+            if not confirm:
+                console.print("[yellow]Cancelled.[/yellow]")
+                raise typer.Exit(code=0)
+        
+        # Execute git commit
+        console.print("[cyan]⏳ Applying commit...[/cyan]")
+        success = apply_commit_message(repo_path, commit_msg)
+        
+        if success:
+            console.print("[green]✓ Commit applied successfully[/green]")
+        else:
+            console.print("[red]Failed to apply commit[/red]")
+            raise typer.Exit(code=1)
+    
+    except typer.Exit:
+        raise
+    except Exception as e:
+        console.print(f"[red]Unexpected error: {e}[/red]")
+        raise typer.Exit(code=1)
+
