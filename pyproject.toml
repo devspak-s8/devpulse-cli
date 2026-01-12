@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "devpulse-cli"
-version = "0.2.1"
+version = "0.3.0"
 description = "DevPulse – Developer Productivity CLI and GitHub analytics"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -36,7 +36,7 @@ classifiers = [
 ]
 
 dependencies = [
-  "typer>=0.12,<0.13",
+  "typer>=0.21.0",
   "rich>=13.7.0",
   "requests>=2.31.0",
   "questionary>=2.0.0",

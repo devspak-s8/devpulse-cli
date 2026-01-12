@@ -9,12 +9,12 @@ README = (BASE_DIR / "README.md").read_text(encoding="utf-8") if (BASE_DIR / "RE
 
 setup(
     name="devpulse-cli",  # PyPI name ("devpulse" is taken)
-    version="0.2.1",
+    version="0.3.0",
     packages=find_packages(),
     include_package_data=True,
     # Keep core install fast; heavy deps moved to extras
     install_requires=[
-        "typer>=0.12,<0.13",  # typer[all] deprecated in 0.21
+        "typer>=0.21.0",  # Fixed compatibility issues with older versions
         "rich>=13.7.0",
         "colorama>=0.4.6",
         "tabulate>=0.9.0",
