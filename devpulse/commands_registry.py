@@ -3,7 +3,7 @@ Command registry for DevPulse CLI.
 Imports all command modules and makes them available for registration.
 """
 
-from devpulse.commands import track, logs, secrets, stats, sync, ai, health, project, timer, notes, focus, breaks, report, config, export, habits, dashboard, github
+from devpulse.commands import track, logs, secrets, stats, sync, ai, health, project, timer, notes, focus, breaks, report, config, export, habits, dashboard, github, expense
 
 # List of all command modules with their CLI names
 COMMAND_MODULES = [
@@ -25,4 +25,5 @@ COMMAND_MODULES = [
     ("habits", habits.app, "Track habits and streaks"),
     ("dashboard", dashboard.app, "Summary dashboard view"),
     ("github", github.app, "GitHub integration and statistics"),
+    ("expense", expense.app, "Track personal and project expenses"),
 ]
